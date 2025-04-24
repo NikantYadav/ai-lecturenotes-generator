@@ -17,6 +17,21 @@ genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL")
 GEMINI_MODEL = genai.GenerativeModel(GEMINI_MODEL_NAME)
 
+token_usage = {
+    "total_input_tokens": 0,
+    "total_output_tokens": 0,
+    "steps": {}
+}
+
+def log_token_usage(step_name, input_tokens, output_tokens):
+    token_usage["total_input_tokens"] += input_tokens
+    token_usage["total_output_tokens"] += output_tokens
+    token_usage["steps"][step_name] = {
+        "input": input_tokens,
+        "output": output_tokens,
+        "total": input_tokens + output_tokens
+    }
+    logger.info(f"Token usage for {step_name}: {input_tokens} in, {output_tokens} out")
 
 def load_and_clean_transcript(file_path):
     logger.info(f"Loading and cleaning transcript from {file_path}")
@@ -40,6 +55,18 @@ def extract_diagram_references(raw_transcript):
             Respond with a JSON list: [{"timestamp": "HH:MM:SS", "context": "text near mention"}]
             """, raw_transcript]
         )
+
+        prompt = """
+        Analyze the transcript to identify all mentions of relevant educational diagrams or visual aids. 
+        Identify mentions of diagrams or visual aids with their timestamps in the transcript.
+        Respond with a JSON list: [{"timestamp": "HH:MM:SS", "context": "text near mention"}]
+        """
+        token_info = GEMINI_MODEL.count_tokens([prompt, raw_transcript])
+        input_tokens = token_info.total_tokens
+        output_tokens = response.usage_metadata.candidates_token_count
+        log_token_usage("diagram_references", input_tokens, output_tokens)
+
+
         diagram_references = json.loads(response.text[response.text.find('['):response.text.rfind(']')+1])
         logger.info(f"Found {len(diagram_references)} diagram references.")
 
@@ -116,6 +143,17 @@ def analyze_frame_relevance(frame):
             Respond with JSON: {"relevant": true/false, "score": 0-1, "reason": "..."}
             """, pil_img])
 
+        prompt = """
+        Is this frame a relevant and complete diagram, graph, illustration or plot for educational notes?
+        Respond with JSON: {"relevant": true/false, "score": 0-1, "reason": "..."}
+        """
+
+        token_info = GEMINI_MODEL.count_tokens([prompt, pil_img])
+        input_tokens = token_info.total_tokens
+
+        output_tokens = frame_relevance_analysis.usage_metadata.candidates_token_count
+        log_token_usage("frame_analysis", input_tokens, output_tokens)
+
         frame_relevance_result = json.loads(frame_relevance_analysis.text[frame_relevance_analysis.text.find('{'):frame_relevance_analysis.text.rfind('}')+1])
 
         logger.info(f"Frame relevance: {frame_relevance_result['relevant']}, score: {frame_relevance_result['score']}")
@@ -168,6 +206,27 @@ def generate_outline(transcript):
             7. Any other relevant details that can aid in creating educational notes
             8. Formulas and Technical Knowledge
             """, transcript])
+        
+        prompt = """
+            Analyze the provided transcript and create a detailed educational outline of the content.
+            Using the Transcript, identify the core main topics, subtopics, and technical concepts.
+            Your analysis should focus on:
+            1. Main themes and concepts
+            2. Indepth explanation and examples
+            3. Logical flow of information
+            4. Key points and supporting details
+            5. Any references to diagrams or visual aids
+            6. Contextual information that enhances understanding
+            7. Any other relevant details that can aid in creating educational notes
+            8. Formulas and Technical Knowledge
+            """
+        
+        token_info = GEMINI_MODEL.count_tokens([prompt, transcript])
+        input_tokens = token_info.total_tokens
+        
+        output_tokens = response.usage_metadata.candidates_token_count
+        log_token_usage("outline_generation", input_tokens, output_tokens)
+
         logger.info("Outline generated successfully.")
         return response.text
     except Exception as e:
@@ -261,6 +320,13 @@ def enrich_outline_with_diagrams(outline, diagrams):
         """
 
         response = GEMINI_MODEL.generate_content(prompt)
+
+        token_info = GEMINI_MODEL.count_tokens(prompt)
+        input_tokens = token_info.total_tokens
+
+        output_tokens = response.usage_metadata.candidates_token_count
+        log_token_usage("content_enrichment", input_tokens, output_tokens)
+
         content = response.text.strip()
 
         if content.startswith("```markdown"):
@@ -276,7 +342,6 @@ def enrich_outline_with_diagrams(outline, diagrams):
         return outline
 
 
-
 def run_pipeline(transcript_path, video_path, output_md):
     logger.info(f"Running pipeline for transcript: {transcript_path}, video: {video_path}")
     try:
@@ -287,8 +352,13 @@ def run_pipeline(transcript_path, video_path, output_md):
         print(refs)
         diagrams = extract_diagrams(video_path, refs, 'Data/Frames')
         enriched = enrich_outline_with_diagrams(outline, diagrams)
-        output = format_to_markdown(enriched, diagrams, output_md)
-        logger.info(f"Pipeline completed successfully. Notes saved at: {output}")
+        markdown_output = format_to_markdown(enriched, diagrams, output_md)
+
+        logger.info(f"Pipeline completed successfully. Notes saved at: {markdown_output}")
+        logger.info("\n=== Token Usage Summary ===")
+        logger.info(f"Total Input Tokens: {token_usage['total_input_tokens']}")
+        logger.info(f"Total Output Tokens: {token_usage['total_output_tokens']}")
+
     except Exception as e:
         logger.error(f"Error during pipeline execution: {e}")
         raise
@@ -310,3 +380,4 @@ if __name__ == "__main__":
         video_path="Data/Video/video.mp4",
         output_md="output/lecture_notes.md"
     )
+

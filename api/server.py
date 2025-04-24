@@ -9,7 +9,7 @@ import tempfile
 import requests
 from fpdf import FPDF
 
-from controllers import load_and_clean_transcript, generate_outline, extract_diagram_references, extract_diagrams, enrich_outline_with_diagrams,  format_to_markdown, run_pipeline
+from controllers import run_pipeline
 
 app = FastAPI()
 
@@ -59,38 +59,12 @@ async def upload_lecture(request: LectureUploadRequest):
         
         run_pipeline(transcript_path, video_path, output_md)
 
-        pdf_file_path = convert_markdown_to_pdf(output_md)
-
         os.remove(video_path)
         os.remove(transcript_path)
         os.remove(output_md)
 
-        return FileResponse(pdf_file_path, media_type='application/pdf', filename=os.path.basename(pdf_file_path))
+        return FileResponse(output_md, media_type='text/markdown', filename=os.path.basename(output_md))
     
     except Exception as e:
         logger.error(f"Error during upload lecture process: {e}")
         raise HTTPException(status_code=500, detail="An error occurred while processing the lecture files.")
-
-def convert_markdown_to_pdf(markdown_file_path: str) -> str:
-    """Convert the generated markdown notes into a PDF."""
-    pdf_file_path = markdown_file_path.replace('.md', '.pdf')
-    
-    try:
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        
-        with open(markdown_file_path, "r", encoding="utf-8") as md_file:
-            for line in md_file:
-                pdf.multi_cell(0, 10, line)
-        
-        pdf.output(pdf_file_path)
-        logger.info(f"PDF generated and saved at: {pdf_file_path}")
-        
-        return pdf_file_path
-    
-    except Exception as e:
-        logger.error(f"Error converting markdown to PDF: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while converting markdown to PDF.")
-    
