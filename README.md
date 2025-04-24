@@ -47,6 +47,21 @@
    mkdir -p Data/{Frames,Transcript,Video} output
    ```
 
+4. **Make and configure ENV file**
+   ```bash
+   touch .env
+   ```
+
+   The `.env` file should contain the following environment variables:
+
+   ```
+   GEMINI_API_KEY=<your_gemini_api_key>
+   GEMINI_MODEL=<your_gemini_model_name>
+   ```
+
+   - **GEMINI_API_KEY**: Your API key for accessing the Gemini API.
+   - **GEMINI_MODEL**: The specific Gemini model you want to use for processing.
+
 ---
 
 ## Usage
