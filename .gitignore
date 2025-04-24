@@ -1,0 +1,10 @@
+.env
+/env
+
+Leature AI Features.pdf
+/__pycache__
+/Data
+/output
+api/__pycache__/controllers.cpython-310.pyc
+api/__pycache__/main.cpython-310.pyc
+api/__pycache__/server.cpython-310.pyc
