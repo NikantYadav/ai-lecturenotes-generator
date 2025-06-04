@@ -1,70 +1,57 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
 import os
 import logging
-from pydantic import BaseModel
-from io import BytesIO
-import shutil
-import tempfile
-import requests
-from fpdf import FPDF
+from datetime import datetime
+from dotenv import load_dotenv
 
-from controllers import run_pipeline
+from routes.lecture_routes import router as lecture_router
+from config.database import Database
 
-app = FastAPI()
+# Load environment variables
+load_dotenv()
 
-
+# Configure logging
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-os.makedirs("output", exist_ok=True)
+# Create FastAPI app with metadata
+app = FastAPI()
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
-class LectureUploadRequest(BaseModel):
-    courseCode: str
-    year: int
-    quarter: str
-    videoId: str
-    videoUrl: str
-    transcriptUrl: str
+# Include routers
+app.include_router(lecture_router)
 
+@app.on_event("startup")
+async def startup_db_client():
+    """Connect to MongoDB when the app starts"""
+    await Database.connect_to_mongodb()
 
-@app.post("/uploadLecture")
-async def upload_lecture(request: LectureUploadRequest):
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    """Close MongoDB connection when the app shuts down"""
+    await Database.close_mongodb_connection()
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
     try:
-
-        logger.info(f"Downloading video from {request.videoUrl}")
-        video_response = requests.get(request.videoUrl)
-        
-        if video_response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to download video.")
-        
-        logger.info(f"Downloading transcript from {request.transcriptUrl}")
-        transcript_response = requests.get(request.transcriptUrl)
-        
-        if transcript_response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to download transcript.")
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as temp_video_file:
-            temp_video_file.write(video_response.content)
-            video_path = temp_video_file.name
-            logger.info(f"Video saved at: {video_path}")
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as temp_transcript_file:
-            temp_transcript_file.write(transcript_response.content)
-            transcript_path = temp_transcript_file.name
-            logger.info(f"Transcript saved at: {transcript_path}")
-        
-        output_md = os.path.join("output", f"{request.videoId}_lecture_notes.md")
-        
-        run_pipeline(transcript_path, video_path, output_md)
-
-        os.remove(video_path)
-        os.remove(transcript_path)
-        os.remove(output_md)
-
-        return FileResponse(output_md, media_type='text/markdown', filename=os.path.basename(output_md))
-    
+        # Try to ping the database
+        await Database.db.command("ping")
+        return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        logger.error(f"Error during upload lecture process: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing the lecture files.")
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=500, detail="Database not connected")
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)

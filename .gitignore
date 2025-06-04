@@ -8,3 +8,7 @@ Leature AI Features.pdf
 api/__pycache__/controllers.cpython-310.pyc
 api/__pycache__/main.cpython-310.pyc
 api/__pycache__/server.cpython-310.pyc
+api/__pycache__/server.cpython-310.pyc
+
+.pyc
+__pycache__/
