@@ -32,6 +32,8 @@
 └── script.py             # Core processing pipeline
 ```
 
+**Note**: PDF storage location is currently set to `api/output/pdfs/` and can be modified in the `process_lecture` function within `api/controllers/lecture_controller.py`.
+
 ---
 
 ## Installation
