@@ -1,15 +1,13 @@
 ## AI Lecture Notes Generator (AILecN)
 
-**AILecN** is a Python-based tool that automatically generates structured lecture notes with diagrams from educational videos. Designed for students, educators, and self-learners, it streamlines content conversion through AI-powered processing.
-
-
+**AILecN** is a Python-based tool that automatically generates structured lecture notes with diagrams from educational videos. Designed for students, educators, and self-learners, it streamlines content conversion through AI-powered processing .
 
 ## Features
 
-- **Automated Note Generation**: Extracts key concepts from video/audio lectures
-- **Visual Aid Integration**: Embeds relevant diagrams using computer vision
-- **API-Driven Workflow**: REST endpoint for scalable processing
-- **Temporary File Management**: Automatic cleanup after processing
+- **Automated Note Generation**: Extracts key concepts from video/audio lectures 
+- **Visual Aid Integration**: Embeds relevant diagrams using computer vision and AI analysis
+- **PDF Output**: Generates professional PDF lecture notes with embedded diagrams
+- **API-Driven Workflow**: Complete REST API with MongoDB integration for scalable processing
 
 ---
 
@@ -18,18 +16,32 @@
 ```
 .
 ├── api/                   # FastAPI endpoint implementation
+│   ├── config/           # Database configuration
+│   ├── controllers/      # Business logic controllers
+│   ├── models/           # Data models and schemas
+│   ├── routes/           # API route definitions
+│   ├── utils/            # Utility functions
+│   ├── output/pdfs/      # Generated PDF files
+│   └── requirements.txt  # API-specific dependencies
 ├── Data/
 │   ├── Frames/           # Extracted video frames
 │   ├── Transcript/       # Processed lecture transcripts
 │   └── Video/            # Source video files
-├── output/               # Generated lecture notes
-├── requirements.txt      # Python dependencies
-└── script.py             # Main processing script
+├── output/               # Generated lecture notes (local processing)
+├── requirements.txt      # Main dependencies
+└── script.py             # Core processing pipeline
 ```
 
 ---
 
 ## Installation
+
+### Prerequisites
+- Python 3.10.11+
+- Google Chrome browser (for PDF generation)
+- MongoDB (for API functionality)
+
+### Setup Steps
 
 1. **Clone Repository**
    ```bash
@@ -47,58 +59,87 @@
    mkdir -p Data/{Frames,Transcript,Video} output
    ```
 
-4. **Make and configure ENV file**
+4. **Configure Environment Variables**
+   
+   Create a `.env` file in the root directory:
    ```bash
    touch .env
    ```
 
-   The `.env` file should contain the following environment variables:
+   Add the following environment variables:
+   ```env
+   # OpenAI Configuration
+   OPENAI_API_KEY=<your_openai_api_key>
+   OPENAI_MODEL=gpt-4o
 
-   ```
-   GEMINI_API_KEY=<your_gemini_api_key>
-   GEMINI_MODEL=<your_gemini_model_name>
+   # Google Cloud Vertex AI (Optional - uncomment in script.py if using)
+   GOOGLE_APPLICATION_CREDENTIALS_LOCATION=<path_to_credentials_json>
+   VERTEXAI_PROJECT=<your_project_id>
+   VERTEXAI_LOCATION=<your_location>
    ```
 
-   - **GEMINI_API_KEY**: Your API key for accessing the Gemini API.
-   - **GEMINI_MODEL**: The specific Gemini model you want to use for processing.
+   - **OPENAI_API_KEY**: Your OpenAI API key for GPT model access
+   - **OPENAI_MODEL**: The OpenAI model to use (e.g., `gpt-4o`, `gpt-4`, `gpt-3.5-turbo`)
 
 ---
 
 ## Usage
 
 ### Local Processing
-1. Place source files:
-   - Videos in `Data/Video/`
-   - Transcripts in `Data/Transcript/`
+1. **Place source files:**
+   - Videos in `Data/Video/video.mp4`
+   - Transcripts in `Data/Transcript/video.txt`
 
-2. Run processing script:
+2. **Run processing script:**
    ```bash
    python script.py
    ```
 
-3. **Output**:  
-   Generated notes appear at `output/lecture_notes.md`
+3. **Output:**  
+   - Markdown notes: `output/lecture_notes.md`
+   - PDF notes: `output/lecture_notes.pdf`
+   - Extracted frames: `Data/Frames_1/`
+
+### Key Features in Local Processing
+- **Token Usage Tracking**: Monitors API costs with detailed breakdown
+- **Rate Limit Handling**: Automatic retry with exponential backoff
+- **PDF Generation**: Professional output using Chrome headless browser
+- **Visual Integration**: AI-powered diagram extraction and embedding
 
 ---
 
 ## API Integration
 
-AILecN provides a comprehensive RESTful API built with FastAPI. Below are the available endpoints and their usage:
+AILecN provides a comprehensive RESTful API built with FastAPI and MongoDB. The API supports scalable processing with background tasks and automatic file management.
 
-### Setup 
-Inside the api folder, create a new .env file which will include the following - 
+### API Setup 
 
-```
-# MongoDB connection string
-MONGODB_URI=
+1. **Install API Dependencies**
+   ```bash
+   cd api
+   pip install -r requirements.txt
+   ```
 
-# Port for the API server
-PORT=
+2. **Configure API Environment**
+   
+   Create `.env` file in the `api/` directory:
+   ```env
+   # MongoDB Configuration
+   MONGODB_URI=<mongodb_uri>
 
-# API Key for Gemini
-GEMINI_API_KEY=
-GEMINI_MODEL=
-```
+   # Server Configuration
+   PORT=8000
+
+   # OpenAI Configuration
+   OPENAI_API_KEY=<your_openai_api_key>
+   OPENAI_MODEL=gpt-4o
+   ```
+
+3. **Start API Server**
+   ```bash
+   cd api
+   uvicorn server:app --reload
+   ```
 
 ### API Endpoints
 
@@ -213,29 +254,7 @@ curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/status"
   "status": "processing"
 }
 ```
-Status can be "pending", "processing", "completed", or "failed".
-
-#### Get Notes by ID
-**`GET /api/notes/{notes_id}`**
-
-Get notes by their ID.
-
-**Example:**
-```bash
-curl -X GET "http://localhost:8000/api/notes/64c12e8c6a9f2e1c2a3b4d5f"
-```
-
-**Response:**
-```json
-{
-  "_id": "64c12e8c6a9f2e1c2a3b4d5f",
-  "lectureId": "64c12d7b5a9f2e1c2a3b4d5e",
-  "content": "# Lecture Notes\n\n## Introduction to Linear Algebra\n...",
-  "format": "md",
-  "createdAt": "2025-06-04T10:25:45.678Z",
-  "updatedAt": "2025-06-04T10:25:45.678Z"
-}
-```
+Status can be "not started", "processing", "completed".
 
 #### Get Notes by Lecture ID
 **`GET /api/lectures/{lecture_id}/notes`**
@@ -252,48 +271,39 @@ curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/notes"
 {
   "_id": "64c12e8c6a9f2e1c2a3b4d5f",
   "lectureId": "64c12d7b5a9f2e1c2a3b4d5e",
-  "content": "# Lecture Notes\n\n## Introduction to Linear Algebra\n...",
-  "format": "md",
+  "fileUrl": "/api/output/pdfs/lecture_64c12d7b5a9f2e1c2a3b4d5e.pdf",
+  "format": "pdf",
   "createdAt": "2025-06-04T10:25:45.678Z",
   "updatedAt": "2025-06-04T10:25:45.678Z"
 }
 ```
 
-#### Get Raw Notes Content
-**`GET /api/lectures/{lecture_id}/notes/content`**
+#### Get Notes File URL
+**`GET /api/lectures/{lecture_id}/notes/url`**
 
-Get the raw Markdown content of notes associated with a lecture.
+Get the file URL for downloading PDF notes.
 
 **Example:**
 ```bash
-curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/notes/content"
+curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/notes/url"
 ```
 
 **Response:**
-Raw markdown content with `Content-Type: text/markdown`
+```json
+{
+  "fileUrl": "/api/output/pdfs/lecture_64c12d7b5a9f2e1c2a3b4d5e.pdf",
+  "format": "pdf"
+}
+```
 
 ---
 
 ### API Workflow
 
-1. Create a lecture using `POST /api/lectures`
-2. Start processing using `POST /api/lectures/{lecture_id}/process`
-3. Check processing status with `GET /api/lectures/{lecture_id}/status`
-4. Once completed, retrieve the notes with `GET /api/lectures/{lecture_id}/notes/content`
-
-The API handles:
-- Downloading video and transcript files
-- Processing media files to extract information
-- Generating structured lecture notes with diagrams
-- Storing results in a MongoDB database
-- Automatic cleanup of temporary files
-
----
-
-## Requirements
-
-- Python 3.10.11
-- All Python libraries listed in `requirements.txt`
+1. **Create a lecture** using `POST /api/lectures`
+2. **Start processing** using `POST /api/lectures/{lecture_id}/process`
+3. **Monitor progress** with `GET /api/lectures/{lecture_id}/status`
+4. **Retrieve PDF notes** with `GET /api/lectures/{lecture_id}/notes/url`
 
 ---
 
@@ -312,3 +322,24 @@ This project is currently not associated with a specific open-source license. Pl
 ## Contact
 
 For questions, suggestions, or contributions, please open an issue on the GitHub repository.
+
+
+---
+
+## Future Scope & Improvements
+
+- [ ] Diagram Detection Enhancements
+
+- [ ] Notes Quality Improvements
+
+- [ ] Consistency in Notes Generation
+
+- [ ] Fixing Litellm Logging issues
+
+- [ ] Task Management & Queue System : Implement robust background job processing with Redis/Celery
+
+- [ ] Failed Status Implementation
+
+
+---
+

@@ -510,7 +510,7 @@ def enrich_outline_with_diagrams(outline, diagrams):
         print(f"Error enriching outline with diagrams: {e}")
         return outline
 
-def run_pipeline(transcript_path, video_path, output_md):
+def run_pipeline(transcript_path, video_path, output_md, lecture_id):
     print(f"Running pipeline for transcript: {transcript_path}, video: {video_path}")
     try:
         raw_transcript = open(transcript_path, 'r', encoding='utf-8').read()
@@ -520,7 +520,7 @@ def run_pipeline(transcript_path, video_path, output_md):
         outline = generate_outline(clean_transcript)
         refs = extract_diagram_references(raw_transcript)
         print(f"Found {len(refs)} diagram references: {[ref['timestamp'] for ref in refs]}")
-        diagrams = extract_diagrams(video_path, refs, 'Data/Frames')
+        diagrams = extract_diagrams(video_path, refs, f"Data/Frames_{lecture_id}")
         enriched = enrich_outline_with_diagrams(outline, diagrams)
         markdown_output = format_to_markdown(enriched, diagrams, output_md)
 
@@ -558,6 +558,7 @@ if __name__ == "__main__":
     pdf_output = run_pipeline(
         transcript_path="Data/Transcript/video.txt",
         video_path="Data/Video/video.mp4",
-        output_md="output/lecture_notes.md"
+        output_md="output/lecture_notes.md",
+        lecture_id="1"
     )
     print(f"Final PDF output available at: {pdf_output}")
