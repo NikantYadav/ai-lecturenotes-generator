@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, FileResponse
 from pydantic import BaseModel
 from bson import ObjectId, json_util
 import json
+import os
 from controllers.lecture_controller import LectureController, NotesController
 from models.models import LectureModel, NotesModel
 from typing import Dict, Any
@@ -27,8 +28,13 @@ async def create_lecture(lecture: LectureRequest):
     Create a new lecture entry with video and transcript URLs
     Returns the ID of the created document
     """
-    lecture_id = await LectureController.create_lecture(lecture.dict())
-    return JSONResponse(content={"id": lecture_id}, status_code=201)
+    try:
+        lecture_id = await LectureController.create_lecture(lecture.dict())
+        return JSONResponse(content={"id": lecture_id}, status_code=201)
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/lectures/{lecture_id}")
 async def get_lecture(lecture_id: str):
@@ -49,8 +55,22 @@ async def process_lecture(lecture_id: str, background_tasks: BackgroundTasks):
     Process a lecture to generate notes
     This runs in the background as it may take some time
     """
-    background_tasks.add_task(LectureController.process_lecture, lecture_id)
-    return JSONResponse(content={"message": f"Processing started for lecture {lecture_id}"})
+    try:
+        # Check if lecture is already completed
+        lecture = await LectureController.get_lecture(lecture_id)
+        if lecture.get("status") == "completed":
+            return JSONResponse(
+                content={"message": f"Lecture {lecture_id} has already been processed and completed"},
+                status_code=200
+            )
+        
+        # If not completed, start the processing
+        background_tasks.add_task(LectureController.process_lecture, lecture_id)
+        return JSONResponse(content={"message": f"Processing started for lecture {lecture_id}"})
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/api/lectures/{lecture_id}/status")
 async def get_lecture_status(lecture_id: str):
@@ -60,19 +80,6 @@ async def get_lecture_status(lecture_id: str):
     try:
         lecture = await LectureController.get_lecture(lecture_id)
         return JSONResponse(content={"status": lecture["status"]})
-    except HTTPException as e:
-        raise e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/api/notes/{notes_id}")
-async def get_notes(notes_id: str):
-    """
-    Get notes by ID
-    """
-    try:
-        notes = await NotesController.get_notes(notes_id)
-        return JSONResponse(content=parse_json(notes))
     except HTTPException as e:
         raise e
     except Exception as e:
@@ -91,14 +98,19 @@ async def get_lecture_notes(lecture_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/api/lectures/{lecture_id}/notes/content")
+@router.get("/api/lectures/{lecture_id}/notes/url")
 async def get_lecture_notes_content(lecture_id: str):
     """
     Get the raw notes content associated with a lecture
+    For PDF format, this will return the file URL instead of content
     """
     try:
         notes = await NotesController.get_notes_by_lecture(lecture_id)
-        return Response(content=notes["content"], media_type="text/markdown")
+        if notes["format"] == "pdf":
+            return JSONResponse(content={"fileUrl": notes["fileUrl"], "format": "pdf"})
+        else:
+            # Backward compatibility for markdown content
+            return Response(content=notes["content"], media_type="text/markdown")
     except HTTPException as e:
         raise e
     except Exception as e:

@@ -16,6 +16,8 @@ load_dotenv()
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+logging.getLogger("litellm").disabled = True
+
 # Create FastAPI app with metadata
 app = FastAPI()
 

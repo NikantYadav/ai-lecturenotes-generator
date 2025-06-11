@@ -45,8 +45,9 @@ class LectureModel(BaseModel):
 class NotesModel(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     lectureId: PyObjectId
-    content: str
-    format: str = "md"
+    content: Optional[str] = None  # For backward compatibility with markdown content
+    fileUrl: Optional[str] = None  # URL/path to the generated PDF file
+    format: str = "pdf"  # Changed default to pdf
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
     
