@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, Response, FileResponse
 from pydantic import BaseModel
-from bson import ObjectId, json_util
+from bson import ObjectId
+import bson.json_util as json_util
 import json
 import os
 from controllers.lecture_controller import LectureController, NotesController

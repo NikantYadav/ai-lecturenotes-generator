@@ -313,6 +313,7 @@ def markdown_to_html(md_path, html_path):
     <html>
     <head>
       <meta charset="utf-8">
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
       <style>
         body {{ font-family: sans-serif; margin: 40px; }}
         img {{ max-width: 100%; height: auto; }}
@@ -345,7 +346,7 @@ def html_to_pdf(html_path, pdf_path):
         # Load the HTML file
         file_url = "file://" + os.path.abspath(html_path)
         driver.get(file_url)
-        time.sleep(2)  # wait for full render including images
+        time.sleep(6)  # wait for full render including images
 
         # Use DevTools command to print PDF
         pdf = driver.execute_cdp_cmd("Page.printToPDF", {
@@ -406,6 +407,16 @@ def convert_markdown_to_pdf(md_path, output_dir):
 def format_to_markdown(enriched_outline, diagrams, output_file):
     print(f"Formatting enriched notes to markdown: {output_file}")
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    def replace_latex_blocks(text):
+        return re.sub(
+            r'(?<![-])\[\s*((?:\\.|[^\[\]\\])+?)\s*\](?!\()',  # avoids markdown checklist & image syntax
+            lambda m: f"$$\n{m.group(1).strip()}\n$$",
+            text,
+            flags=re.DOTALL
+        )
+
+    enriched_outline = replace_latex_blocks(enriched_outline)
 
     toc = ["# Table of Contents"]
     content = []
@@ -433,7 +444,7 @@ def format_to_markdown(enriched_outline, diagrams, output_file):
                 alt_text = diagram.get('description', 'Diagram')
                 # img_block = f"\n![{alt_text}]({rel_path})\n*Figure ({timestamp}): {alt_text}*\n"
                 img_block = f"\n![]({rel_path})\n"
-                line = re.sub(r'See Figure: \d{2}:\d{2}:\d{2}', img_block, line)
+                line = re.sub(r'See Figure: \d{2}:\d{2}:\d{2}', lambda m: img_block, line)
                 inserted = True
 
         content.append(line)
@@ -467,7 +478,10 @@ def enrich_outline_with_diagrams(outline, diagrams):
         - Inserting a placeholder like `See Figure: <timestamp>` exactly where each diagram #logically fits in the explanation.
         - Writing a **caption** for each diagram using its description, tailored to reinforce the explanation above.
         - If a diagram relates to a technical concept or formula, **expand on that concept** using your understanding of the visual content.
-        - Where appropriate, include **LaTeX-formatted equations** to make mathematical parts clearer.
+        - Where appropriate, include **LaTeX-formatted equations**:
+            - Use `$...$` for inline math
+            - Use `$$...$$` for block math 
+            - Avoid brackets like `[ \sum ... ]` — use proper LaTeX syntax instead to make mathematical parts clearer.
         - Ensure the final output is in well-structured **Markdown format**, with:
         - Headings and subheadings preserved and improved
         - Bullet points or numbered lists where helpful
@@ -478,6 +492,8 @@ def enrich_outline_with_diagrams(outline, diagrams):
         - **Explain concepts clearly**
         - **Integrate visuals in context**, not as afterthoughts
 
+        Here is what you need to avoid:
+        - Do not include the name of the instructor in the notes
         Outline -
         {outline}
 

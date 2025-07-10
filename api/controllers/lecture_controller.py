@@ -9,6 +9,7 @@ from datetime import datetime
 from fastapi import HTTPException
 from config.database import Database
 from dotenv import load_dotenv
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -138,15 +139,18 @@ class LectureController:
             os.environ["OPENAI_MODEL"] = os.getenv("OPENAI_MODEL", "gpt-4o")
             
             # The run_pipeline function now returns the PDF file path
-            pdf_file_path = run_pipeline(transcript_path, video_path, temp_output_md, lecture_id)
             
+            # pdf_file_path = run_pipeline(transcript_path, video_path, temp_output_md, lecture_id)
+            pdf_file_path = await asyncio.to_thread(
+                run_pipeline, transcript_path, video_path, temp_output_md, lecture_id
+            )
             # Generate a permanent PDF file path with lecture ID
             pdf_filename = f"lecture_{lecture_id}.pdf"
             permanent_pdf_path = os.path.join(pdf_output_dir, pdf_filename)
             
             # Move the generated PDF to the permanent location
             import shutil
-            shutil.move(pdf_file_path, permanent_pdf_path)
+            await asyncio.to_thread(shutil.move, pdf_file_path, permanent_pdf_path)
             
             # Create file URL (you might want to adjust this based on your server setup)
             pdf_file_url = f"/api/output/pdfs/{pdf_filename}"
@@ -173,14 +177,14 @@ class LectureController:
             )
             
             # Clean up temporary files
-            os.remove(video_path)
-            os.remove(transcript_path)
-            os.remove(temp_output_md)
+            await asyncio.to_thread(os.remove,video_path)
+            await asyncio.to_thread(os.remove, transcript_path)
+            await asyncio.to_thread(os.remove, temp_output_md)
             
             frames_dir = f"Data/Frames_{lecture_id}"
             if os.path.exists(frames_dir):
                 try:
-                    shutil.rmtree(frames_dir)
+                    await asyncio.to_thread(shutil.rmtree, frames_dir)
                     logger.info(f"Removed frames directory: {frames_dir}")
                 except Exception as e:
                     logger.warning(f"Failed to remove frames directory {frames_dir}: {e}")
