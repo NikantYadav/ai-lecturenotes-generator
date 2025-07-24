@@ -17,7 +17,7 @@ load_dotenv()
 # Add parent directory to path to import from original codebase
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from script import run_pipeline
-
+from script_audio import revision_audio_pipeline, podcast_audio_pipeline
 logger = logging.getLogger(__name__)
 
 class LectureController:
@@ -220,3 +220,180 @@ class NotesController:
         except Exception as e:
             logger.error(f"Error retrieving notes by lecture: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to retrieve notes: {str(e)}")
+
+
+class AudioController:
+    @staticmethod
+    async def create_revision_audio(lecture_id, voice="nova", emotion_type="revision"):
+        """
+        Create revision audio for a lecture
+        1. Get lecture data and check if it exists
+        2. Download transcript
+        3. Generate revision audio using the audio pipeline
+        4. Save audio data to database
+        5. Update lecture with audio info
+        """
+        try:
+            # Get lecture data
+            lectures_collection = Database.db.lectures
+            lecture = await lectures_collection.find_one({"_id": ObjectId(lecture_id)})
+            if not lecture:
+                raise HTTPException(status_code=404, detail=f"Lecture with ID {lecture_id} not found")
+        
+            # Import utility function
+            from utils.file_utils import download_file
+            
+            try:
+                # Download transcript
+                transcript_path = await download_file(lecture['transcriptUrl'], ".txt")
+                
+                # Read transcript content
+                with open(transcript_path, 'r', encoding='utf-8') as f:
+                    transcript_content = f.read()
+                    
+            except HTTPException as e:
+                raise
+            
+            # Create output directory for audio files
+            audio_output_dir = os.path.join(os.path.dirname(__file__), '..', 'output', 'audio')
+            os.makedirs(audio_output_dir, exist_ok=True)
+            
+            # Generate revision audio using the pipeline
+            logger.info(f"Generating revision audio for lecture {lecture_id}")
+            
+            # Run the audio pipeline
+            audio_result = await asyncio.to_thread(
+                revision_audio_pipeline,
+                transcript_content,
+                audio_output_dir,
+                f"lecture_{lecture_id}"
+            )
+            
+            # Create permanent paths and URLs
+            audio_filename = f"lecture_{lecture_id}_revision.mp3"
+            permanent_audio_path = os.path.join(audio_output_dir, audio_filename)
+            
+            # Move the generated audio to permanent location if needed
+            if audio_result["revision_audio"] != permanent_audio_path:
+                await asyncio.to_thread(shutil.move, audio_result["revision_audio"], permanent_audio_path)
+            
+            # Create file URL
+            audio_file_url = f"/api/output/audio/{audio_filename}"
+            
+            notes_collection = Database.db.notes
+            notes_record = await notes_collection.find_one({"lectureId": ObjectId(lecture_id)})
+
+            await notes_collection.update_one(
+                {"lectureId": ObjectId(lecture_id)},
+                {"$set": {
+                    "revisionAudio": audio_file_url,
+                    "updatedAt": datetime.utcnow()
+                }}
+            )
+
+            notes_id = notes_record["_id"]
+            await asyncio.to_thread(os.remove, transcript_path)
+
+            logger.info(f"Audio generation completed for lecture {lecture_id}")
+    
+            return {
+                "lectureId": str(lecture_id),
+                "notesId": str(notes_id),
+                "audioUrl": audio_file_url,
+                "revisionNotes": audio_result["revision_notes"],
+                "status": "completed"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating revision audio: {e}")
+            # Update lecture status to failed
+            raise HTTPException(status_code=500, detail=f"Failed to create revision audio: {str(e)}")
+
+    @staticmethod
+    async def create_podcast_audio(lecture_id):
+        """
+        Create podcast audio for a lecture
+        1. Get lecture data and check if it exists
+        2. Download transcript
+        3. Generate podcast audio using the podcast pipeline
+        4. Save audio data to database
+        5. Update lecture with podcast audio info
+        """
+        try:
+            # Get lecture data
+            lectures_collection = Database.db.lectures
+            lecture = await lectures_collection.find_one({"_id": ObjectId(lecture_id)})
+            if not lecture:
+                raise HTTPException(status_code=404, detail=f"Lecture with ID {lecture_id} not found")
+        
+            # Import utility function
+            from utils.file_utils import download_file
+            
+            try:
+                # Download transcript
+                transcript_path = await download_file(lecture['transcriptUrl'], ".txt")
+                
+                # Read transcript content
+                with open(transcript_path, 'r', encoding='utf-8') as f:
+                    transcript_content = f.read()
+                    
+            except HTTPException as e:
+                raise
+            
+            # Create output directory for audio files
+            audio_output_dir = os.path.join(os.path.dirname(__file__), '..', 'output', 'audio')
+            os.makedirs(audio_output_dir, exist_ok=True)
+            
+            # Generate podcast audio using the pipeline
+            logger.info(f"Generating podcast audio for lecture {lecture_id}")
+            
+            # Run the podcast pipeline
+            podcast_result = await asyncio.to_thread(
+                podcast_audio_pipeline,
+                transcript_content,
+                audio_output_dir,
+                f"lecture_{lecture_id}"
+            )
+            
+            # Create permanent paths and URLs
+            audio_filename = f"lecture_{lecture_id}_podcast.mp3"
+            permanent_audio_path = os.path.join(audio_output_dir, audio_filename)
+            
+            # Move the generated audio to permanent location if needed
+            if podcast_result["podcast_audio"] != permanent_audio_path:
+                await asyncio.to_thread(shutil.move, podcast_result["podcast_audio"], permanent_audio_path)
+            
+            # Create file URL
+            audio_file_url = f"/api/output/audio/{audio_filename}"
+            
+            # Update notes collection with podcast audio
+            notes_collection = Database.db.notes
+            notes_record = await notes_collection.find_one({"lectureId": ObjectId(lecture_id)})
+
+            await notes_collection.update_one(
+                {"lectureId": ObjectId(lecture_id)},
+                {"$set": {
+                    "podcastAudio": audio_file_url,
+                    "updatedAt": datetime.utcnow()
+                }}
+            )
+
+            notes_id = notes_record["_id"]
+            
+            # Clean up temporary files
+            await asyncio.to_thread(os.remove, transcript_path)
+
+            logger.info(f"Podcast audio generation completed for lecture {lecture_id}")
+    
+            return {
+                "lectureId": str(lecture_id),
+                "notesId": str(notes_id),
+                "podcastAudioUrl": audio_file_url,
+                "status": "completed"
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating podcast audio: {e}")
+            # Update lecture status to failed
+            raise HTTPException(status_code=500, detail=f"Failed to create podcast audio: {str(e)}")
+        

@@ -5,7 +5,7 @@ from bson import ObjectId
 import bson.json_util as json_util
 import json
 import os
-from controllers.lecture_controller import LectureController, NotesController
+from controllers.lecture_controller import LectureController, NotesController, AudioController
 from models.models import LectureModel, NotesModel
 from typing import Dict, Any
 
@@ -112,6 +112,82 @@ async def get_lecture_notes_content(lecture_id: str):
         else:
             # Backward compatibility for markdown content
             return Response(content=notes["content"], media_type="text/markdown")
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.post("/api/lectures/{lecture_id}/audio/revision/create")
+async def get_revision_audio(lecture_id: str):
+    """
+    Get the revision audio file for a lecture
+    """
+    try:
+        notes = await NotesController.get_notes_by_lecture(lecture_id)
+        if not notes:
+            raise HTTPException(status_code=404, detail="Notes not found for this lecture")
+
+        if not notes.get("revisionAudio"):
+            revision_result = await AudioController.create_revision_audio(lecture_id)
+            return revision_result["audioUrl"]
+        else:
+            return notes.get("revisionAudio")
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/lectures/{lecture_id}/audio/podcast/create")
+async def get_podcast_audio(lecture_id: str):
+    """
+    Get the podcast audio file for a lecture
+    """
+    try:
+        notes = await NotesController.get_notes_by_lecture(lecture_id)
+        if not notes:
+            raise HTTPException(status_code=404, detail="Notes not found for this lecture")
+
+        if not notes.get("podcastAudio"):
+            podcast_result = await AudioController.create_podcast_audio(lecture_id)
+            return podcast_result["podcastAudioUrl"]
+        else:
+            return notes.get("podcastAudio")
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/api/lectures/{lecture_id}/audio/revision")
+async def get_revision_audio_file(lecture_id: str):
+    """
+    Get the revision audio file url for a lecture
+    """
+    try:
+        notes = await NotesController.get_notes_by_lecture(lecture_id)
+        if not notes or not notes.get("revisionAudio"):
+            raise HTTPException(status_code=404, detail="Revision audio not found for this lecture")
+
+        return notes["revisionAudio"]
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/api/lectures/{lecture_id}/audio/podcast")
+async def get_podcast_audio_file(lecture_id: str):
+    """
+    Get the podcast audio file url for a lecture
+    """
+    try:
+        notes = await NotesController.get_notes_by_lecture(lecture_id)
+        if not notes or not notes.get("podcastAudio"):
+            raise HTTPException(status_code=404, detail="Podcast audio not found for this lecture")
+
+        return notes["podcastAudio"]
+    
     except HTTPException as e:
         raise e
     except Exception as e:

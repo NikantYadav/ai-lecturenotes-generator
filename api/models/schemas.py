@@ -26,11 +26,14 @@ lectures_schema = {
 
 notes_schema = {
     "bsonType": "object",
-    "required": ["lectureId", "content", "format", "createdAt", "updatedAt"],
+    "required": ["lectureId", "createdAt", "updatedAt"],
     "properties": {
         "lectureId": {"bsonType": "objectId"},
-        "content": {"bsonType": "string"},
+        "content": {"bsonType": ["string", "null"]},
+        "fileUrl": {"bsonType": ["string", "null"]},
         "format": {"bsonType": "string"},
+        "revisionAudio": {"bsonType": ["string", "null"]},
+        "podcastAudio": {"bsonType": ["string", "null"]},
         "createdAt": {"bsonType": "date"},
         "updatedAt": {"bsonType": "date"}
     }

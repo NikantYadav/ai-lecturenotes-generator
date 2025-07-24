@@ -48,6 +48,8 @@ class NotesModel(BaseModel):
     content: Optional[str] = None  # For backward compatibility with markdown content
     fileUrl: Optional[str] = None  # URL/path to the generated PDF file
     format: str = "pdf"  # Changed default to pdf
+    revisionAudio: Optional[str] = None  
+    podcastAudio: Optional[str] = None 
     createdAt: datetime = Field(default_factory=datetime.utcnow)
     updatedAt: datetime = Field(default_factory=datetime.utcnow)
     

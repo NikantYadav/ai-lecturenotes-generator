@@ -16,7 +16,17 @@ load_dotenv()
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+import logging
+
+# Suppress MongoDB debug logs
+logging.getLogger("pymongo").setLevel(logging.WARNING)
+logging.getLogger("pymongo.command").setLevel(logging.WARNING)
+logging.getLogger("pymongo.connection").setLevel(logging.WARNING)
+logging.getLogger("pymongo.server_selection").setLevel(logging.WARNING)
 logging.getLogger("litellm").disabled = True
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 # Create FastAPI app with metadata
 app = FastAPI()

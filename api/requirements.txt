@@ -40,6 +40,7 @@ pillow==11.3.0
 propcache==0.3.2
 pydantic==2.11.5
 pydantic_core==2.33.2
+pydub==0.25.1
 pymango==0.1.1
 pymongo==4.13.2
 PySocks==1.7.1

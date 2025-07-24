@@ -7,6 +7,7 @@
 - **Automated Note Generation**: Extracts key concepts from video/audio lectures 
 - **Visual Aid Integration**: Embeds relevant diagrams using computer vision and AI analysis
 - **PDF Output**: Generates professional PDF lecture notes with embedded diagrams
+- **Audio Generation**: Creates revision and podcast audio files from lecture notes
 - **API-Driven Workflow**: Complete REST API with MongoDB integration for scalable processing
 
 ---
@@ -298,6 +299,62 @@ curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/notes/u
 }
 ```
 
+#### Create Revision Audio
+**`POST /api/lectures/{lecture_id}/audio/revision/create`**
+
+Generate and retrieve the revision audio file for a lecture. If already generated, returns the existing file URL.
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/audio/revision/create"
+```
+**Response:**
+```json
+"/api/output/audio/lecture_64c12d7b5a9f2e1c2a3b4d5e_revision.mp3"
+```
+
+#### Create Podcast Audio
+**`POST /api/lectures/{lecture_id}/audio/podcast/create`**
+
+Generate and retrieve the podcast audio file for a lecture. If already generated, returns the existing file URL.
+
+**Example:**
+```bash
+curl -X POST "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/audio/podcast/create"
+```
+**Response:**
+```json
+"/api/output/audio/lecture_64c12d7b5a9f2e1c2a3b4d5e_podcast.mp3"
+```
+
+#### Get Revision Audio File URL
+**`GET /api/lectures/{lecture_id}/audio/revision`**
+
+Get the URL for the revision audio file for a lecture.
+
+**Example:**
+```bash
+curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/audio/revision"
+```
+**Response:**
+```json
+"/api/output/audio/lecture_64c12d7b5a9f2e1c2a3b4d5e_revision.mp3"
+```
+
+#### Get Podcast Audio File URL
+**`GET /api/lectures/{lecture_id}/audio/podcast`**
+
+Get the URL for the podcast audio file for a lecture.
+
+**Example:**
+```bash
+curl -X GET "http://localhost:8000/api/lectures/64c12d7b5a9f2e1c2a3b4d5e/audio/podcast"
+```
+**Response:**
+```json
+"/api/output/audio/lecture_64c12d7b5a9f2e1c2a3b4d5e_podcast.mp3"
+```
+
 ---
 
 ### API Workflow
@@ -341,6 +398,4 @@ For questions, suggestions, or contributions, please open an issue on the GitHub
 - [ ] Task Management & Queue System : Implement robust background job processing with Redis/Celery
 
 - [ ] Failed Status Implementation
-
----
 
