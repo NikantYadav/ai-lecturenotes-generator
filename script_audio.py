@@ -4,7 +4,9 @@ from pathlib import Path
 from openai import OpenAI
 import time
 import dotenv
-from pydub import AudioSegment
+import librosa
+import soundfile as sf
+import numpy as np
 
 # Load environment variables
 dotenv.load_dotenv()
@@ -163,6 +165,53 @@ def convert_to_dialogue(script):
     )
     return response.choices[0].message.content.strip()
 
+def load_audio_with_librosa(file_path):
+    """Load audio file using librosa and return audio data and sample rate"""
+    try:
+        audio_data, sample_rate = librosa.load(file_path, sr=None)
+        return audio_data, sample_rate
+    except Exception as e:
+        print(f"Error loading audio file {file_path}: {e}")
+        return None, None
+
+def concatenate_audio_librosa(audio_files, output_path, target_sr=22050):
+    """Concatenate multiple audio files using librosa and soundfile"""
+    
+    if not audio_files:
+        print("No audio files to concatenate")
+        return None
+    
+    combined_audio = np.array([])
+    
+    for i, file_path in enumerate(audio_files):
+        print(f"Processing file {i+1}/{len(audio_files)}: {file_path}")
+        
+        # Load audio file
+        audio_data, sr = load_audio_with_librosa(file_path)
+        
+        if audio_data is None:
+            print(f"Skipping {file_path} due to loading error")
+            continue
+        
+        # Resample if necessary
+        if sr != target_sr:
+            audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=target_sr)
+        
+        # Concatenate audio
+        if combined_audio.size == 0:
+            combined_audio = audio_data
+        else:
+            combined_audio = np.concatenate([combined_audio, audio_data])
+    
+    # Save the combined audio
+    try:
+        sf.write(output_path, combined_audio, target_sr)
+        print(f"Successfully saved combined audio to: {output_path}")
+        return output_path
+    except Exception as e:
+        print(f"Error saving combined audio: {e}")
+        return None
+
 def generate_podcast_audio(script, output_path):
     """Generate podcast audio with two speakers and emotional tones, preserving dialogue order."""
 
@@ -202,17 +251,15 @@ def generate_podcast_audio(script, output_path):
         generate_tts_segment(text, filename, voice=voice, emotion=emotion)
         temp_files.append(filename)
 
-    # 3) Concatenate all segments in order
-    combined = AudioSegment.empty()
-    for fn in temp_files:
-        combined += AudioSegment.from_mp3(fn)
+    # 3) Concatenate all segments in order using librosa
+    concatenate_audio_librosa(temp_files, output_path)
 
-    # 4) Export final podcast file
-    combined.export(output_path, format='mp3')
-
-    # 5) Clean up temporary files
+    # 4) Clean up temporary files
     for fn in temp_files:
-        Path(fn).unlink()
+        try:
+            Path(fn).unlink()
+        except FileNotFoundError:
+            pass  # File already deleted or doesn't exist
 
     print(f"Podcast audio written to {output_path} (built from {len(temp_files)} segments)")
 
@@ -239,14 +286,8 @@ def generate_tts_segment(text, output_path, voice="shimmer", emotion="neutral"):
         response.stream_to_file(output_path)
 
 def combine_audio(segment_files, output_path):
-    """Combine multiple audio segments into a single file"""
-    
-    combined = AudioSegment.empty()
-    for file in segment_files:
-        sound = AudioSegment.from_mp3(file)
-        combined += sound
-    
-    combined.export(output_path, format="mp3")
+    """Combine multiple audio segments into a single file using librosa"""
+    return concatenate_audio_librosa(segment_files, output_path)
 
 def podcast_audio_pipeline(transcript, output_dir=None, base_filename="podcast"):
     """Pipeline for creating podcast audio from script with emotional TTS
